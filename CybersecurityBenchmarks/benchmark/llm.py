@@ -22,6 +22,7 @@ from typing_extensions import override
 from .benchmark_utils import audio_to_b64, image_to_b64
 from .cache_handler import CacheHandler
 
+from unsloth import FastLanguageModel
 
 NUM_LLM_RETRIES = 100
 MAX_RETRY_TIMEOUT = 600
@@ -439,8 +440,107 @@ def create(identifier: str) -> LLM:
         return ANYSCALE(name, api_key)
     if provider == "TOGETHER":
         return TOGETHER(name, api_key)
+    if provider == "LOCAL":
+        return LOCAL(name, api_key)
 
     raise ValueError(f"Unknown provider: {provider}")
+
+class LOCAL(LLM):
+    """Accessing LOCAL"""
+    def __init__(self, model_name: str, api_key: str) -> None:
+        super().__init__(model_name, api_key)
+
+        max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
+        dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
+        load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False.
+
+        self.model, self.tokenizer = FastLanguageModel.from_pretrained(
+            model_name = model_name,
+            max_seq_length = max_seq_length,
+            dtype = dtype,
+            load_in_4bit = load_in_4bit,
+        )
+
+        FastLanguageModel.for_inference(self.model) # Enable native 2x faster inference
+
+    @override
+    def chat(
+        self,
+        prompt_with_history: List[str],
+        guided_decode_json_schema: Optional[str] = None,
+    ) -> str:
+        messages = []
+        for i in range(len(prompt_with_history)):
+            if i % 2 == 0:
+                messages.append({"role": "user", "content": prompt_with_history[i]})
+            else:
+                messages.append(
+                    {"role": "assistant", "content": prompt_with_history[i]}
+                )
+
+        level = logging.getLogger().level
+        logging.getLogger().setLevel(logging.WARNING)
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize = True,
+            padding = True,
+            add_generation_prompt = True, # Must add for generation
+            return_tensors = "pt",
+        ).to("cuda")
+
+        outputs = self.model.generate(input_ids = inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        outputs = self.tokenizer.batch_decode(outputs)
+
+        logging.getLogger().setLevel(level)
+        return outputs[0]
+
+    @override
+    def chat_with_system_prompt(
+        self,
+        system_prompt: str,
+        prompt_with_history: List[str],
+        guided_decode_json_schema: Optional[str] = None,
+    ) -> str:
+        print("Calling llm chat with sys prompt...")
+        messages = [{"role": "system", "content": system_prompt}]
+        for i in range(len(prompt_with_history)):
+            if i % 2 == 0:
+                messages.append({"role": "user", "content": prompt_with_history[i]})
+            else:
+                messages.append(
+                    {"role": "assistant", "content": prompt_with_history[i]}
+                )
+
+        level = logging.getLogger().level
+        logging.getLogger().setLevel(logging.WARNING)
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize = True,
+            padding = True,
+            add_generation_prompt = True, # Must add for generation
+            return_tensors = "pt",
+        ).to("cuda")
+
+        outputs = self.model.generate(input_ids = inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        outputs = self.tokenizer.batch_decode(outputs)
+
+        logging.getLogger().setLevel(level)
+        return outputs[0]
+
+    @override
+    def query(
+        self, prompt: str, guided_decode_json_schema: Optional[str] = None
+    ) -> str:
+        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+        outputs = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        outputs = self.tokenizer.batch_decode(outputs)
+        return outputs[0]
+
+    @override
+    def valid_models(self) -> list[str]:
+        return ["Qwen/Qwen2.5-Coder-7B-Instruct"]
 
 
 class OPENAI(LLM):

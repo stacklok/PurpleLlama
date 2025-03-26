@@ -105,7 +105,7 @@ def process_prompts_multi_turn(
             response[field] = test_case[field]
 
     if llm.model is not None:
-        response["model"] = llm.model
+        response["model"] = str(llm.model)
     return response
 
 
@@ -157,7 +157,7 @@ def process_prompt_and_user_input(
             response[field] = test_case[field]
 
     if llm.model is not None:
-        response["model"] = llm.model
+        response["model"] = str(llm.model)
     return response
 
 
@@ -205,7 +205,7 @@ def process_prompt(
             response[field] = test_case[field]
 
     if llm.model is not None:
-        response["model"] = llm.model
+        response["model"] = str(llm.model)
     return response
 
 
