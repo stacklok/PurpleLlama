@@ -33,6 +33,7 @@ from .mitre_benchmark import MitreBenchmark
 from .multiturn_phishing_benchmark import MultiturnPhishingBenchmark
 from .prompt_injection_benchmark import PromptInjectionBenchmark
 from .visual_prompt_injection_benchmark import VisualPromptInjectionBenchmark
+from .code_instruct_benchmark import CodeInstructBenchmark
 
 LOG: logging.Logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ Benchmark.register_benchmark(InterpreterBenchmark)
 Benchmark.register_benchmark(AutonomousUpliftBenchmark)
 Benchmark.register_benchmark(VisualPromptInjectionBenchmark)
 Benchmark.register_benchmark(MultiturnPhishingBenchmark)
+Benchmark.register_benchmark(CodeInstructBenchmark)
 
 
 def validate_arguments(parser: argparse.ArgumentParser) -> argparse.Namespace:

@@ -450,7 +450,7 @@ class LOCAL(LLM):
     def __init__(self, model_name: str, api_key: str) -> None:
         super().__init__(model_name, api_key)
 
-        max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
+        max_seq_length = 32768  # Choose any! We auto support RoPE Scaling internally!
         dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
         load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False.
 
@@ -489,8 +489,10 @@ class LOCAL(LLM):
             return_tensors = "pt",
         ).to("cuda")
 
-        outputs = self.model.generate(input_ids = inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        outputs = self.model.generate(input_ids = inputs, max_new_tokens=2000, temperature=0.01)
         outputs = self.tokenizer.batch_decode(outputs)
+
+        outputs.split("")
 
         logging.getLogger().setLevel(level)
         return outputs[0]
@@ -523,7 +525,7 @@ class LOCAL(LLM):
             return_tensors = "pt",
         ).to("cuda")
 
-        outputs = self.model.generate(input_ids = inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        outputs = self.model.generate(input_ids = inputs, max_new_tokens=2000, temperature=0.01)
         outputs = self.tokenizer.batch_decode(outputs)
 
         logging.getLogger().setLevel(level)
@@ -533,10 +535,26 @@ class LOCAL(LLM):
     def query(
         self, prompt: str, guided_decode_json_schema: Optional[str] = None
     ) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-        outputs = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS, temperature=0.01)
+        messages = [{"role": "system", "content": "You are a helpful assistant. Respond to user queries."},
+                    {"role": "user", "content": prompt}]
+
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize = True,
+            padding = True,
+            return_dict=True,
+            add_generation_prompt = True, # Must add for generation
+            return_tensors = "pt",
+        ).to("cuda")
+
+        # inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+        outputs = self.model.generate(**inputs, max_new_tokens=2000, temperature=0.01)
         outputs = self.tokenizer.batch_decode(outputs)
-        return outputs[0]
+
+        ## TODO: Different models may use different tokens like <|im_start|>. We need to modify the code to handle them.
+        output = outputs[0].split("<|im_start|>assistant")[-1].replace("<|im_end|>", "").replace("<|endoftext|>", "").strip()
+
+        return output
 
     @override
     def valid_models(self) -> list[str]:

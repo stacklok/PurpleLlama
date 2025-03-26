@@ -41,6 +41,7 @@ test_case_fields = [
     "voice_tone",
     "label",
     "sample_id",
+    "pattern_desc",
 ]
 
 
