@@ -492,10 +492,12 @@ class LOCAL(LLM):
         outputs = self.model.generate(input_ids = inputs, max_new_tokens=2000, temperature=0.01)
         outputs = self.tokenizer.batch_decode(outputs)
 
-        outputs.split("")
-
         logging.getLogger().setLevel(level)
-        return outputs[0]
+
+        ## TODO: Different models may use different tokens like <|im_start|>. We need to modify the code to handle them.
+        output = outputs[0].split("<|im_start|>assistant")[-1].replace("<|im_end|>", "").replace("<|endoftext|>", "").strip()
+        return output
+
 
     @override
     def chat_with_system_prompt(
@@ -529,7 +531,10 @@ class LOCAL(LLM):
         outputs = self.tokenizer.batch_decode(outputs)
 
         logging.getLogger().setLevel(level)
-        return outputs[0]
+
+        ## TODO: Different models may use different tokens like <|im_start|>. We need to modify the code to handle them.
+        output = outputs[0].split("<|im_start|>assistant")[-1].replace("<|im_end|>", "").replace("<|endoftext|>", "").strip()
+        return output
 
     @override
     def query(
@@ -556,6 +561,7 @@ class LOCAL(LLM):
 
         return output
 
+    ## TODO: Is adding names ot this list necessary?
     @override
     def valid_models(self) -> list[str]:
         return ["Qwen/Qwen2.5-Coder-7B-Instruct"]
